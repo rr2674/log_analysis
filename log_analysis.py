@@ -20,15 +20,12 @@ def most_popular_three_articles(db):
      at the top.
     """
     query = r"""
-    select title, subq.views as views
-      from articles,
-          ( select substring(path,'\/article\/(.*)') as logslug,
-                   count(*) as views
-              from log
-              group by path ) as subq
-      where  slug = subq.logslug
-      order by views desc
-      limit 3;
+    select title, count(*) as views
+      from articles, log
+     where slug = substring(path,'\/article\/(.*)')
+     group by title
+     order by views desc
+     limit 3;
     """
 
     print('\nWhich articles have been accessed the most?\n')
@@ -44,16 +41,11 @@ def most_popular_article_authors(db):
     """
 
     query = r"""
-    select name, views
-      from authors,
-          ( select author, count(*) as views
-              from articles,
-                  ( select substring(path,'\/article\/(.*)') as logslug
-                      from log ) as subq1
-             where logslug is not null
-               and slug = subq1.logslug
-             group by author) as subq2
-     where authors.id = subq2.author
+    select name, count(*) as views
+      from authors, articles, log
+     where articles.slug = substring(log.path,'\/article\/(.*)')
+       and authors.id = articles.author
+     group by name
      order by views desc;
     """
 
@@ -68,7 +60,7 @@ def daily_error_gt_1pct(db):
     """
 
     query = """
-    select day, to_char(error_pct,'999D99%') as error_pct
+    select day, round(error_pct,2) as error_pct
       from ( select day,
                    ( (  sum(occurance) filter(where status != '200 OK')
                       / sum(occurance) ) * 100 ) as error_pct
@@ -84,7 +76,7 @@ def daily_error_gt_1pct(db):
 
     print('\nOn which days did more than 1% of requests lead to errors?\n')
     for row in do_query(db, query):
-        print('\t{} -- {} errors'.format(row[0], row[1]))
+        print('\t{} -- {}% errors'.format(row[0], row[1]))
 
 
 if __name__ == '__main__':
